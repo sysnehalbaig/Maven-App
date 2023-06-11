@@ -1,0 +1,47 @@
+pipeline {
+    agent any
+    tools {
+        maven "apache-maven"
+    }
+
+    stages{
+      stage("SCM"){
+          steps {
+            checkout scmGit(branches: [[name: '*/main']], extensions: [], userRemoteConfigs: [[credentialsId: 'f4bae14d-94d1-4b8b-b2ab-21d23d71dd86', url: 'https://github.com/spring-projects/spring-petclinic.git']])
+             sh 'ls -lrt'
+          }
+      }
+      stage("build"){
+          steps {
+            sh 'mvn compile'
+          }
+      }
+      stage("test"){
+          steps {
+            // sh 'mvn test'
+            sh ' mvn surefire-report:report'
+          }
+      }
+      stage("package"){
+          steps {
+            sh 'mvn package'
+            sh 'ls -lat'
+            sh 'ls target -lat'
+          }
+      }
+       stage("deploy"){
+           steps {
+                 sshagent(['b1c44091-8994-4de4-b46e-9e590cb4c087']) {
+                     sh "scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no target/spring-petclinic-3.1.0-SNAPSHOT.jar  ubuntu@20.74.129.157:~/spring-petclinic;"
+                     sh 'ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -l ubuntu 20.74.129.157 "pwd;cd ~/spring-petclinic;java -jar *.jar"'
+                 }  
+             }
+       }
+    }
+
+    post{
+        success{
+                junit '${WORKSPACE}/target/surefire-reports/*.xml'
+        }
+     }
+}
